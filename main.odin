@@ -76,6 +76,8 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 			parse_ld_b_imm8(binary, instruction) or_return
 		case 0x07:
 			parse_rlca(binary, instruction) or_return
+		case 0x08:
+			parse_ld_addr16_sp(binary, instruction) or_return
 		case:
 			return DisassembleError.UnexpectedByte
 		}
@@ -112,10 +114,10 @@ test_parse_nop :: proc(t: ^testing.T) {
 
 parse_ld_bc_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
 	op_byte := binary_next(binary) or_return
-	hi := binary_next(binary) or_return
 	lo := binary_next(binary) or_return
+	hi := binary_next(binary) or_return
 
-	result: u16 = (cast(u16)(hi << 8)) | (cast(u16)lo)
+	result: u16 = (cast(u16)hi << 8) | (cast(u16)lo)
 	instruction.op = Opcode.LD
 	instruction.type = LoadInstruction {
 		destination = .BC,
@@ -134,7 +136,7 @@ test_parse_ld_bc_imm16 :: proc(t: ^testing.T) {
 			destination = Register.BC
 		}
 	}
-	test_instruction_parse(t, []byte{0x01, 0x00, 0x01}, expected)
+	test_instruction_parse(t, []byte{0x01, 0x01, 0x00}, expected)
 }
 
 parse_ld_bc_a :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
@@ -258,3 +260,30 @@ test_parse_rlca :: proc(t: ^testing.T) {
 	expected := Instruction{ op = Opcode.RLCA }
 	test_instruction_parse(t, []byte{0x07}, expected)
 }
+
+parse_ld_addr16_sp :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	lo := binary_next(binary) or_return
+	hi := binary_next(binary) or_return
+	address: u16 = (cast(u16)hi << 8) | (cast(u16)lo)
+
+	instruction.op = Opcode.LD
+	instruction.type = LoadInstruction {
+		destination = Register.SP,
+		source = address
+	}
+	return nil
+}
+
+@(test)
+test_parse_ld_addr16_sp :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = LoadInstruction {
+			destination = Register.SP,
+			source = 0x1234
+		}
+	}
+	test_instruction_parse(t, []byte{0x08, 0x34, 0x12}, expected) // little endian 0x1234
+}
+
