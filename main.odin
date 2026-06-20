@@ -55,19 +55,18 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Di
 			return nil
 		}
 
-		inst := instructions[i]
+		// Get a reference to the value we're modifying.
+		instruction := &instructions[i]
 
 		switch b {
 		case 0x00:
-			parse_nop(binary, &inst) or_return
+			parse_nop(binary, instruction) or_return
 		case 0x01:
-			parse_ld_bc_imm16(binary, &inst) or_return
+			parse_ld_bc_imm16(binary, instruction) or_return
 		case 0x02:
 		case:
 			return DisassembleError.UnexpectedByte
 		}
-
-		fmt.println(inst)
 	}
 
 	return nil
@@ -90,7 +89,7 @@ test_parse_nop :: proc(t: ^testing.T) {
 		allocator = context.allocator
 	}
 
-	instructions := make([dynamic]Instruction, 1, 1);
+	instructions := make([dynamic]Instruction, 1);
 	defer delete(instructions)
 	disassemble(&bin, &instructions)
 
@@ -123,3 +122,22 @@ parse_ld_bc_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Disass
 	return nil
 }
 
+@(test)
+test_parse_ld_bc_imm16 :: proc(t: ^testing.T) {
+	bin := Binary {
+		buf = []byte{0x01, 0x00, 0x01},
+		allocator = context.allocator
+	}
+
+	instructions := make([dynamic]Instruction, 1);
+	defer delete(instructions)
+	disassemble(&bin, &instructions)
+
+	testing.expect_value(t, instructions[0], Instruction{
+		op = Opcode.LD,
+		type = LoadInstruction {
+			source = u16(0x01),
+			destination = Register.BC
+		}
+	})
+}
