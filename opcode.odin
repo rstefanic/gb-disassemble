@@ -23,7 +23,10 @@ Value :: union {
 
 // Instruction Types
 Control :: struct {}
-Jump :: struct {}
+Steps :: distinct u8
+Jump :: union {
+	Steps
+}
 Load :: struct {
 	destination: Value,
 	source: Value,
