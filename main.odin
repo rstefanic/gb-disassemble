@@ -91,18 +91,24 @@ parse_nop :: proc (binary: ^Binary, instruction: ^Instruction) -> DisassembleErr
 	return nil
 }
 
-@(test)
-test_parse_nop :: proc(t: ^testing.T) {
-	bin := Binary {
-		buf = []byte{0x00},
-		allocator = context.allocator
-	}
+// Helper function for setting up instruction parsing tests.
+test_instruction_parse :: proc(t: ^testing.T, buf: []byte, expected_instruction: Instruction) {
+		bin := Binary {
+			buf = buf,
+			allocator = context.allocator
+		}
 
 	instructions := make([dynamic]Instruction, 1);
 	defer delete(instructions)
 	disassemble(&bin, &instructions)
 
-	testing.expect_value(t, instructions[0], Instruction{op = Opcode.NOP})
+	testing.expect_value(t, instructions[0], expected_instruction)
+}
+
+@(test)
+test_parse_nop :: proc(t: ^testing.T) {
+	expected := Instruction{op = Opcode.NOP}
+	test_instruction_parse(t, []byte{0x00}, expected)
 }
 
 parse_ld_bc_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -133,22 +139,14 @@ parse_ld_bc_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Disass
 
 @(test)
 test_parse_ld_bc_imm16 :: proc(t: ^testing.T) {
-	bin := Binary {
-		buf = []byte{0x01, 0x00, 0x01},
-		allocator = context.allocator
-	}
-
-	instructions := make([dynamic]Instruction, 1);
-	defer delete(instructions)
-	disassemble(&bin, &instructions)
-
-	testing.expect_value(t, instructions[0], Instruction{
+	expected := Instruction{
 		op = Opcode.LD,
 		type = LoadInstruction {
 			source = u16(0x01),
 			destination = Register.BC
 		}
-	})
+	}
+	test_instruction_parse(t, []byte{0x01, 0x00, 0x01}, expected)
 }
 
 parse_ld_bc_a :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -168,22 +166,14 @@ parse_ld_bc_a :: proc(binary: ^Binary, instruction: ^Instruction) -> Disassemble
 
 @(test)
 test_parse_ld_bc_a :: proc(t: ^testing.T) {
-		bin := Binary {
-		buf = []byte{0x02},
-		allocator = context.allocator
-	}
-
-	instructions := make([dynamic]Instruction, 1);
-	defer delete(instructions)
-	disassemble(&bin, &instructions)
-
-	testing.expect_value(t, instructions[0], Instruction{
+	expected := Instruction{
 		op = Opcode.LD,
 		type = LoadInstruction {
 			source = Register.A,
 			destination = Register.BC
 		}
-	})
+	}
+	test_instruction_parse(t,[]byte{0x02}, expected)
 }
 
 parse_inc_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -202,21 +192,13 @@ parse_inc_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleE
 
 @(test)
 test_parse_inc_bc :: proc(t: ^testing.T) {
-		bin := Binary {
-		buf = []byte{0x03},
-		allocator = context.allocator
-	}
-
-	instructions := make([dynamic]Instruction, 1);
-	defer delete(instructions)
-	disassemble(&bin, &instructions)
-
-	testing.expect_value(t, instructions[0], Instruction{
+	expected := Instruction{
 		op = Opcode.INC,
 		type = UnaryArithmeticInstruction {
 			destination = Register.BC
 		}
-	})
+	}
+	test_instruction_parse(t,[]byte{0x03}, expected)
 }
 
 parse_inc_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -235,21 +217,13 @@ parse_inc_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleEr
 
 @(test)
 test_parse_inc_b :: proc(t: ^testing.T) {
-		bin := Binary {
-		buf = []byte{0x04},
-		allocator = context.allocator
-	}
-
-	instructions := make([dynamic]Instruction, 1);
-	defer delete(instructions)
-	disassemble(&bin, &instructions)
-
-	testing.expect_value(t, instructions[0], Instruction{
+	expected := Instruction{
 		op = Opcode.INC,
 		type = UnaryArithmeticInstruction {
 			destination = Register.B
 		}
-	})
+	}
+	test_instruction_parse(t,[]byte{0x04}, expected)
 }
 
 parse_dec_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -268,21 +242,13 @@ parse_dec_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleEr
 
 @(test)
 test_parse_dec_b :: proc(t: ^testing.T) {
-	bin := Binary {
-		buf = []byte{0x05},
-		allocator = context.allocator
-	}
-
-	instructions := make([dynamic]Instruction, 1);
-	defer delete(instructions)
-	disassemble(&bin, &instructions)
-
-	testing.expect_value(t, instructions[0], Instruction{
+	expected := Instruction{
 		op = Opcode.DEC,
 		type = UnaryArithmeticInstruction {
 			destination = Register.B
 		}
-	})
+	}
+	test_instruction_parse(t,[]byte{0x05}, expected)
 }
 
 parse_ld_b_imm8 :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -307,20 +273,12 @@ parse_ld_b_imm8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Disassemb
 
 @(test)
 test_parse_ld_b_imm8 :: proc(t: ^testing.T) {
-	bin := Binary {
-		buf = []byte{0x06, 0x10},
-		allocator = context.allocator
-	}
-
-	instructions := make([dynamic]Instruction, 1);
-	defer delete(instructions)
-	disassemble(&bin, &instructions)
-
-	testing.expect_value(t, instructions[0], Instruction{
+	expected := Instruction{
 		op = Opcode.LD,
 		type = LoadInstruction {
 			destination = Register.B,
 			source = u8(0x10)
 		}
-	})
+	}
+	test_instruction_parse(t,[]byte{0x06, 0x10}, expected)
 }
