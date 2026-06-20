@@ -21,31 +21,31 @@ Value :: union {
 	u16
 }
 
-ControlInstruction :: struct {}
-JumpInstruction :: struct {}
-LoadInstruction :: struct {
+// Instruction Types
+Control :: struct {}
+Jump :: struct {}
+Load :: struct {
 	destination: Value,
 	source: Value,
 }
-UnaryArithmeticInstruction :: struct {
+UnaryArithmetic :: struct {
 	destination: Value
 }
-
-BinaryArithmeticInstruction :: struct {
+BinaryArithmetic :: struct {
 	destination: Value,
 	source: Value,
 }
-BitShiftInstruction :: struct {}
+BitShift :: struct {}
 
 Instruction :: struct {
 	op: Opcode,
 	type: union {
-		ControlInstruction,
-		LoadInstruction,
-		JumpInstruction,
-		UnaryArithmeticInstruction,
-		BinaryArithmeticInstruction,
-		BitShiftInstruction
+		Control,
+		Load,
+		Jump,
+		UnaryArithmetic,
+		BinaryArithmetic,
+		BitShift
 	}
 }
 
