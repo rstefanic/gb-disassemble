@@ -64,6 +64,9 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Di
 		case 0x01:
 			parse_ld_bc_imm16(binary, instruction) or_return
 		case 0x02:
+			parse_ld_bc_a(binary, instruction) or_return
+		case 0x03:
+			parse_inc_bc(binary, instruction) or_return
 		case:
 			return DisassembleError.UnexpectedByte
 		}
@@ -138,6 +141,74 @@ test_parse_ld_bc_imm16 :: proc(t: ^testing.T) {
 		type = LoadInstruction {
 			source = u16(0x01),
 			destination = Register.BC
+		}
+	})
+}
+
+parse_ld_bc_a :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
+	op_byte, err := binary_next(binary)
+	if err != nil {
+		return .UnexpectedEOF
+	}
+
+	instruction.op = Opcode.LD
+	instruction.type = LoadInstruction {
+		destination = Register.BC,
+		source = Register.A
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_ld_bc_a :: proc(t: ^testing.T) {
+		bin := Binary {
+		buf = []byte{0x02},
+		allocator = context.allocator
+	}
+
+	instructions := make([dynamic]Instruction, 1);
+	defer delete(instructions)
+	disassemble(&bin, &instructions)
+
+	testing.expect_value(t, instructions[0], Instruction{
+		op = Opcode.LD,
+		type = LoadInstruction {
+			source = Register.A,
+			destination = Register.BC
+		}
+	})
+}
+
+parse_inc_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
+	op_byte, err := binary_next(binary)
+	if err != nil {
+		return .UnexpectedEOF
+	}
+
+	instruction.op = Opcode.INC
+	instruction.type = UnaryArithmeticInstruction {
+		destination = Register.B,
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_inc_bc :: proc(t: ^testing.T) {
+		bin := Binary {
+		buf = []byte{0x03},
+		allocator = context.allocator
+	}
+
+	instructions := make([dynamic]Instruction, 1);
+	defer delete(instructions)
+	disassemble(&bin, &instructions)
+
+	testing.expect_value(t, instructions[0], Instruction{
+		op = Opcode.INC,
+		type = UnaryArithmeticInstruction {
+			destination = Register.B
 		}
 	})
 }
