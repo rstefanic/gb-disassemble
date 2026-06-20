@@ -27,7 +27,14 @@ LoadInstruction :: struct {
 	destination: Value,
 	source: Value,
 }
-ArithmeticInstruction :: struct {}
+UnaryArithmeticInstruction :: struct {
+	destination: Value
+}
+
+BinaryArithmeticInstruction :: struct {
+	destination: Value,
+	source: Value,
+}
 BitShiftInstruction :: struct {}
 
 Instruction :: struct {
@@ -36,7 +43,8 @@ Instruction :: struct {
 		ControlInstruction,
 		LoadInstruction,
 		JumpInstruction,
-		ArithmeticInstruction,
+		UnaryArithmeticInstruction,
+		BinaryArithmeticInstruction,
 		BitShiftInstruction
 	}
 }
