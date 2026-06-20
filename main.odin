@@ -73,6 +73,8 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Di
 			parse_dec_b(binary, instruction) or_return
 		case 0x06:
 			parse_ld_b_imm8(binary, instruction) or_return
+		case 0x07:
+			parse_rlca(binary, instruction) or_return
 		case:
 			return DisassembleError.UnexpectedByte
 		}
@@ -173,7 +175,7 @@ test_parse_ld_bc_a :: proc(t: ^testing.T) {
 			destination = Register.BC
 		}
 	}
-	test_instruction_parse(t,[]byte{0x02}, expected)
+	test_instruction_parse(t, []byte{0x02}, expected)
 }
 
 parse_inc_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -198,7 +200,7 @@ test_parse_inc_bc :: proc(t: ^testing.T) {
 			destination = Register.BC
 		}
 	}
-	test_instruction_parse(t,[]byte{0x03}, expected)
+	test_instruction_parse(t, []byte{0x03}, expected)
 }
 
 parse_inc_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -223,7 +225,7 @@ test_parse_inc_b :: proc(t: ^testing.T) {
 			destination = Register.B
 		}
 	}
-	test_instruction_parse(t,[]byte{0x04}, expected)
+	test_instruction_parse(t, []byte{0x04}, expected)
 }
 
 parse_dec_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -248,7 +250,7 @@ test_parse_dec_b :: proc(t: ^testing.T) {
 			destination = Register.B
 		}
 	}
-	test_instruction_parse(t,[]byte{0x05}, expected)
+	test_instruction_parse(t, []byte{0x05}, expected)
 }
 
 parse_ld_b_imm8 :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
@@ -280,5 +282,21 @@ test_parse_ld_b_imm8 :: proc(t: ^testing.T) {
 			source = u8(0x10)
 		}
 	}
-	test_instruction_parse(t,[]byte{0x06, 0x10}, expected)
+	test_instruction_parse(t, []byte{0x06, 0x10}, expected)
+}
+
+parse_rlca :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
+	op_byte, err := binary_next(binary)
+	if err != nil {
+		return .UnexpectedEOF
+	}
+
+	instruction.op = Opcode.RLCA
+	return nil
+}
+
+@(test)
+test_parse_rlca :: proc(t: ^testing.T) {
+	expected := Instruction{ op = Opcode.RLCA }
+	test_instruction_parse(t, []byte{0x07}, expected)
 }
