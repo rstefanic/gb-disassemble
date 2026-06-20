@@ -44,16 +44,17 @@ main :: proc () {
 
 DisassembleError :: enum {
 	None,
-	UnexpectedByte,
-	UnexpectedEOF
+	UnexpectedByte
 }
 
-disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> DisassembleError {
+Error :: union {
+	DisassembleError,
+	BinaryError
+}
+
+disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Error {
 	for i := 0; i < len(instructions); i += 1 {
-		b, err := binary_peek(binary) 
-		if err == .EOF {
-			return nil
-		}
+		b := binary_peek(binary) or_return
 
 		// Get a reference to the value we're modifying.
 		instruction := &instructions[i]
@@ -83,22 +84,18 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Di
 	return nil
 }
 
-parse_nop :: proc (binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
-	b, err := binary_next(binary)
-	if err != nil {
-		return .UnexpectedEOF
-	}
-
+parse_nop :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	b := binary_next(binary) or_return
 	instruction.op = Opcode.NOP
 	return nil
 }
 
 // Helper function for setting up instruction parsing tests.
 test_instruction_parse :: proc(t: ^testing.T, buf: []byte, expected_instruction: Instruction) {
-		bin := Binary {
-			buf = buf,
-			allocator = context.allocator
-		}
+	bin := Binary {
+		buf = buf,
+		allocator = context.allocator
+	}
 
 	instructions := make([dynamic]Instruction, 1);
 	defer delete(instructions)
@@ -113,21 +110,10 @@ test_parse_nop :: proc(t: ^testing.T) {
 	test_instruction_parse(t, []byte{0x00}, expected)
 }
 
-parse_ld_bc_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
-	op_byte, err := binary_next(binary)
-	if err != nil {
-		return .UnexpectedEOF
-	}
-
-	hi, hi_err := binary_next(binary)
-	if hi_err != nil {
-		return .UnexpectedEOF
-	}
-
-	lo, lo_err := binary_next(binary)
-	if lo_err != nil {
-		return .UnexpectedEOF
-	}
+parse_ld_bc_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	hi := binary_next(binary) or_return
+	lo := binary_next(binary) or_return
 
 	result: u16 = (cast(u16)(hi << 8)) | (cast(u16)lo)
 	instruction.op = Opcode.LD
@@ -151,12 +137,8 @@ test_parse_ld_bc_imm16 :: proc(t: ^testing.T) {
 	test_instruction_parse(t, []byte{0x01, 0x00, 0x01}, expected)
 }
 
-parse_ld_bc_a :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
-	op_byte, err := binary_next(binary)
-	if err != nil {
-		return .UnexpectedEOF
-	}
-
+parse_ld_bc_a :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
 	instruction.op = Opcode.LD
 	instruction.type = LoadInstruction {
 		destination = Register.BC,
@@ -178,12 +160,8 @@ test_parse_ld_bc_a :: proc(t: ^testing.T) {
 	test_instruction_parse(t, []byte{0x02}, expected)
 }
 
-parse_inc_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
-	op_byte, err := binary_next(binary)
-	if err != nil {
-		return .UnexpectedEOF
-	}
-
+parse_inc_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
 	instruction.op = Opcode.INC
 	instruction.type = UnaryArithmeticInstruction {
 		destination = Register.BC,
@@ -203,12 +181,8 @@ test_parse_inc_bc :: proc(t: ^testing.T) {
 	test_instruction_parse(t, []byte{0x03}, expected)
 }
 
-parse_inc_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
-	op_byte, err := binary_next(binary)
-	if err != nil {
-		return .UnexpectedEOF
-	}
-
+parse_inc_b :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
 	instruction.op = Opcode.INC
 	instruction.type = UnaryArithmeticInstruction {
 		destination = Register.B,
@@ -228,12 +202,8 @@ test_parse_inc_b :: proc(t: ^testing.T) {
 	test_instruction_parse(t, []byte{0x04}, expected)
 }
 
-parse_dec_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
-	op_byte, err := binary_next(binary)
-	if err != nil {
-		return .UnexpectedEOF
-	}
-
+parse_dec_b :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
 	instruction.op = Opcode.DEC
 	instruction.type = UnaryArithmeticInstruction {
 		destination = Register.B,
@@ -253,17 +223,9 @@ test_parse_dec_b :: proc(t: ^testing.T) {
 	test_instruction_parse(t, []byte{0x05}, expected)
 }
 
-parse_ld_b_imm8 :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
-	op_byte, err := binary_next(binary)
-	if err != nil {
-		return .UnexpectedEOF
-	}
-
-	imm8, imm8_err := binary_next(binary)
-	if imm8_err != nil {
-		return .UnexpectedEOF
-	}
-
+parse_ld_b_imm8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	imm8 := binary_next(binary) or_return
 	instruction.op = Opcode.LD
 	instruction.type = LoadInstruction {
 		destination = Register.B,
@@ -285,12 +247,8 @@ test_parse_ld_b_imm8 :: proc(t: ^testing.T) {
 	test_instruction_parse(t, []byte{0x06, 0x10}, expected)
 }
 
-parse_rlca :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
-	op_byte, err := binary_next(binary)
-	if err != nil {
-		return .UnexpectedEOF
-	}
-
+parse_rlca :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
 	instruction.op = Opcode.RLCA
 	return nil
 }
