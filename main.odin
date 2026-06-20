@@ -78,6 +78,12 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 			parse_rlca(binary, instruction) or_return
 		case 0x08:
 			parse_ld_addr16_sp(binary, instruction) or_return
+		case 0x09:
+			parse_add_hl_bc(binary, instruction) or_return
+		case 0x0A:
+			parse_ld_a_bc(binary, instruction) or_return
+		case 0x0B:
+			parse_dec_bc(binary, instruction) or_return
 		case:
 			return DisassembleError.UnexpectedByte
 		}
@@ -285,5 +291,70 @@ test_parse_ld_addr16_sp :: proc(t: ^testing.T) {
 		}
 	}
 	test_instruction_parse(t, []byte{0x08, 0x34, 0x12}, expected) // little endian 0x1234
+}
+
+parse_add_hl_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.ADD
+	instruction.type = BinaryArithmeticInstruction {
+		destination = Register.HL,
+		source = Register.BC
+	}
+	return nil
+}
+
+@(test)
+test_parse_add_hl_bc :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.ADD,
+		type = BinaryArithmeticInstruction {
+			destination = Register.HL,
+			source = Register.BC
+		}
+	}
+	test_instruction_parse(t, []byte{0x09}, expected)
+}
+
+parse_ld_a_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.LD
+	instruction.type = LoadInstruction {
+		destination = Register.A,
+		source = Register.BC
+	}
+	return nil
+}
+
+@(test)
+test_parse_ld_a_bc:: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = LoadInstruction {
+			destination = Register.A,
+			source = Register.BC
+		}
+	}
+	test_instruction_parse(t, []byte{0x0A}, expected)
+}
+
+
+parse_dec_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.DEC
+	instruction.type = UnaryArithmeticInstruction {
+		destination = Register.BC
+	}
+	return nil
+}
+
+@(test)
+test_parse_dec_bc:: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.DEC,
+		type = UnaryArithmeticInstruction {
+			destination = Register.BC
+		}
+	}
+	test_instruction_parse(t, []byte{0x0B}, expected)
 }
 
