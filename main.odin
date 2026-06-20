@@ -67,6 +67,10 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Di
 			parse_ld_bc_a(binary, instruction) or_return
 		case 0x03:
 			parse_inc_bc(binary, instruction) or_return
+		case 0x04:
+			parse_inc_b(binary, instruction) or_return
+		case 0x05:
+			parse_dec_b(binary, instruction) or_return
 		case:
 			return DisassembleError.UnexpectedByte
 		}
@@ -188,7 +192,7 @@ parse_inc_bc :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleE
 
 	instruction.op = Opcode.INC
 	instruction.type = UnaryArithmeticInstruction {
-		destination = Register.B,
+		destination = Register.BC,
 	}
 
 	return nil
@@ -207,6 +211,72 @@ test_parse_inc_bc :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, instructions[0], Instruction{
 		op = Opcode.INC,
+		type = UnaryArithmeticInstruction {
+			destination = Register.BC
+		}
+	})
+}
+
+parse_inc_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
+	op_byte, err := binary_next(binary)
+	if err != nil {
+		return .UnexpectedEOF
+	}
+
+	instruction.op = Opcode.INC
+	instruction.type = UnaryArithmeticInstruction {
+		destination = Register.B,
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_inc_b :: proc(t: ^testing.T) {
+		bin := Binary {
+		buf = []byte{0x04},
+		allocator = context.allocator
+	}
+
+	instructions := make([dynamic]Instruction, 1);
+	defer delete(instructions)
+	disassemble(&bin, &instructions)
+
+	testing.expect_value(t, instructions[0], Instruction{
+		op = Opcode.INC,
+		type = UnaryArithmeticInstruction {
+			destination = Register.B
+		}
+	})
+}
+
+parse_dec_b :: proc(binary: ^Binary, instruction: ^Instruction) -> DisassembleError {
+	op_byte, err := binary_next(binary)
+	if err != nil {
+		return .UnexpectedEOF
+	}
+
+	instruction.op = Opcode.DEC
+	instruction.type = UnaryArithmeticInstruction {
+		destination = Register.B,
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_dec_b :: proc(t: ^testing.T) {
+		bin := Binary {
+		buf = []byte{0x05},
+		allocator = context.allocator
+	}
+
+	instructions := make([dynamic]Instruction, 1);
+	defer delete(instructions)
+	disassemble(&bin, &instructions)
+
+	testing.expect_value(t, instructions[0], Instruction{
+		op = Opcode.DEC,
 		type = UnaryArithmeticInstruction {
 			destination = Register.B
 		}
