@@ -15,6 +15,14 @@ Register :: enum {
 	PC
 }
 
+Flag :: enum {
+	None,
+	C,
+	H,
+	N,
+	Z,
+} 
+
 Value :: union {
 	Register,
 	u8,
@@ -23,9 +31,13 @@ Value :: union {
 
 // Instruction Types
 Control :: struct {}
-Steps :: distinct u8
-Jump :: union {
-	Steps
+ConditionalJump :: struct {
+	steps: u8,
+	flag: Flag,
+	set: bool
+}
+UnconditionalJump :: struct {
+	steps: u8
 }
 Load :: struct {
 	destination: Value,
@@ -45,7 +57,8 @@ Instruction :: struct {
 	type: union {
 		Control,
 		Load,
-		Jump,
+		UnconditionalJump,
+		ConditionalJump,
 		UnaryArithmetic,
 		BinaryArithmetic,
 		BitShift

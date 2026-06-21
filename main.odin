@@ -128,6 +128,40 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 		case 0x1F:
 			parse_rra(binary, instruction) or_return
 
+		// 0x20 - 0x2F
+		case 0x20:
+			parse_jr_nz_s8(binary, instruction) or_return
+		case 0x21:
+			parse_ld_hl_imm16(binary, instruction) or_return
+		case 0x22:
+			parse_ld_hl_a(binary, instruction) or_return
+		case 0x23:
+			parse_inc_hl(binary, instruction) or_return
+		case 0x24:
+			parse_inc_h(binary, instruction) or_return
+		case 0x25:
+			parse_dec_h(binary, instruction) or_return
+		case 0x26:
+			parse_ld_h_imm8(binary, instruction) or_return
+		case 0x27:
+			parse_daa(binary, instruction) or_return
+		case 0x28:
+			parse_jr_z_s8(binary, instruction) or_return
+		case 0x29:
+			parse_add_hl_hl(binary, instruction) or_return
+		case 0x2A:
+			parse_ld_a_hl(binary, instruction) or_return
+		case 0x2B:
+			parse_dec_hl(binary, instruction) or_return
+		case 0x2C:
+			parse_inc_l(binary, instruction) or_return
+		case 0x2D:
+			parse_dec_l(binary, instruction) or_return
+		case 0x2E:
+			parse_ld_l_imm8(binary, instruction) or_return
+		case 0x2F:
+			parse_cpl(binary, instruction) or_return
+
 		case:
 			return DisassembleError.UnexpectedByte
 		}
@@ -642,7 +676,7 @@ parse_jr_s8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
 	steps := binary_next(binary) or_return
 
 	instruction.op = Opcode.JR
-	instruction.type = Jump(Steps(steps))
+	instruction.type = UnconditionalJump{steps = steps}
 	return nil
 }
 
@@ -650,7 +684,7 @@ parse_jr_s8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
 test_parse_jr_s8 :: proc(t: ^testing.T) {
 	expected := Instruction{
 		op = Opcode.JR,
-		type = Jump(Steps(0x67))
+		type = UnconditionalJump{steps = 0x67}
 	}
 	test_instruction_parse(t, []byte{0x18, 0x67}, expected)
 }
@@ -792,4 +826,344 @@ parse_rra :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
 test_parse_rra :: proc(t: ^testing.T) {
 	expected := Instruction{ op = Opcode.RRA }
 	test_instruction_parse(t, []byte{0x1F}, expected)
+}
+
+parse_jr_nz_s8:: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte:= binary_next(binary) or_return
+	steps := binary_next(binary) or_return
+
+	instruction.op = Opcode.JR
+	instruction.type =  ConditionalJump {
+		steps = steps,
+		flag = Flag.Z,
+		set = false
+	}
+	return nil
+}
+
+@(test)
+test_parse_jr_nz_s8 :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.JR,
+		type = ConditionalJump {
+			steps = 0x10,
+			flag = Flag.Z,
+			set = false
+		}
+	}
+	test_instruction_parse(t, []byte{0x20, 0x10}, expected)
+}
+
+parse_ld_hl_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	lo := binary_next(binary) or_return
+	hi := binary_next(binary) or_return
+
+	imm16: u16 = (cast(u16)hi << 8) | (cast(u16)lo)
+	instruction.op = Opcode.LD
+	instruction.type = Load {
+		destination = .HL,
+		source = imm16
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_ld_hl_imm16 :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			source = u16(0x0201),
+			destination = Register.HL
+		}
+	}
+	test_instruction_parse(t, []byte{0x21, 0x01, 0x02}, expected)
+}
+
+parse_ld_hl_a :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.LD
+	instruction.type = Load {
+		destination = Register.HL,
+		source = Register.A
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_ld_hl_a :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			source = Register.A,
+			destination = Register.HL
+		}
+	}
+	test_instruction_parse(t, []byte{0x22}, expected)
+}
+
+parse_inc_hl :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.INC
+	instruction.type = UnaryArithmetic {
+		destination = Register.HL,
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_inc_hl :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.INC,
+		type = UnaryArithmetic {
+			destination = Register.HL
+		}
+	}
+	test_instruction_parse(t, []byte{0x23}, expected)
+}
+
+parse_inc_h :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.INC
+	instruction.type = UnaryArithmetic {
+		destination = Register.H,
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_inc_H :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.INC,
+		type = UnaryArithmetic {
+			destination = Register.H
+		}
+	}
+	test_instruction_parse(t, []byte{0x24}, expected)
+}
+
+parse_dec_h :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.DEC
+	instruction.type = UnaryArithmetic {
+		destination = Register.H,
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_dec_h :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.DEC,
+		type = UnaryArithmetic {
+			destination = Register.H
+		}
+	}
+	test_instruction_parse(t, []byte{0x25}, expected)
+}
+
+parse_ld_h_imm8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	imm8 := binary_next(binary) or_return
+	instruction.op = Opcode.LD
+	instruction.type = Load {
+		destination = Register.H,
+		source = u8(imm8)
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_ld_h_imm8 :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			destination = Register.H,
+			source = u8(0x10)
+		}
+	}
+	test_instruction_parse(t, []byte{0x26, 0x10}, expected)
+}
+
+parse_daa :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.DAA
+	return nil
+}
+
+@(test)
+test_parse_daa :: proc(t: ^testing.T) {
+	expected := Instruction { op = Opcode.DAA }
+	test_instruction_parse(t, []byte{0x27}, expected)
+}
+
+parse_jr_z_s8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	steps := binary_next(binary) or_return
+
+	instruction.op = Opcode.JR
+	instruction.type = ConditionalJump {
+		steps = steps,
+		flag = Flag.Z,
+		set = true
+	}
+	return nil
+}
+
+@(test)
+test_parse_jr_z_s8 :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.JR,
+		type = ConditionalJump {
+			steps = 0x67,
+			flag = Flag.Z,
+			set = true
+		}
+	}
+	test_instruction_parse(t, []byte{0x28, 0x67}, expected)
+}
+
+parse_add_hl_hl :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.ADD
+	instruction.type = BinaryArithmetic {
+		destination = Register.HL,
+		source = Register.HL
+	}
+	return nil
+}
+
+@(test)
+test_parse_add_hl_hl :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.ADD,
+		type = BinaryArithmetic {
+			destination = Register.HL,
+			source = Register.HL
+		}
+	}
+	test_instruction_parse(t, []byte{0x29}, expected)
+}
+
+parse_ld_a_hl :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.LD
+	instruction.type = Load {
+		destination = Register.A,
+		source = Register.HL
+	}
+	return nil
+}
+
+@(test)
+test_parse_ld_a_hl :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			destination = Register.A,
+			source = Register.HL
+		}
+	}
+	test_instruction_parse(t, []byte{0x2A}, expected)
+}
+
+parse_dec_hl :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.DEC
+	instruction.type = UnaryArithmetic {
+		destination = Register.HL
+	}
+	return nil
+}
+
+@(test)
+test_parse_dec_hl :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.DEC,
+		type = UnaryArithmetic {
+			destination = Register.HL
+		}
+	}
+	test_instruction_parse(t, []byte{0x2B}, expected)
+}
+
+parse_inc_l :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.INC
+	instruction.type = UnaryArithmetic {
+		destination = Register.L
+	}
+	return nil
+}
+
+@(test)
+test_parse_inc_l :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.INC,
+		type = UnaryArithmetic {
+			destination = Register.L
+		}
+	}
+	test_instruction_parse(t, []byte{0x2C}, expected)
+}
+
+parse_dec_l :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.DEC
+	instruction.type = UnaryArithmetic {
+		destination = Register.L
+	}
+	return nil
+}
+
+@(test)
+test_parse_dec_l :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.DEC,
+		type = UnaryArithmetic {
+			destination = Register.L
+		}
+	}
+	test_instruction_parse(t, []byte{0x2D}, expected)
+}
+
+parse_ld_l_imm8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	imm := binary_next(binary) or_return
+	instruction.op = Opcode.LD
+	instruction.type = Load {
+		destination = Register.L,
+		source = imm
+	}
+	return nil
+}
+
+@(test)
+test_parse_ld_l_imm8:: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			destination = Register.L,
+			source = u8(0xEE)
+		}
+	}
+	test_instruction_parse(t, []byte{0x2E, 0xEE}, expected)
+}
+
+parse_cpl :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.CPL
+	return nil
+}
+
+@(test)
+test_parse_cpl :: proc(t: ^testing.T) {
+	expected := Instruction{ op = Opcode.CPL }
+	test_instruction_parse(t, []byte{0x2F}, expected)
 }
