@@ -23,10 +23,18 @@ Flag :: enum {
 	Z,
 } 
 
-Value :: union {
-	Register,
-	u8,
-	u16
+Value :: struct {
+	location: union {
+		Register,
+		u8,        //  8 bit immediate value
+		u16,       // 16 bit immediate value
+	},
+	dereference_in_memory: bool,
+	postfix_operator: enum {
+		None,
+		Increment,
+		Decrement
+	}
 }
 
 // Instruction Types
