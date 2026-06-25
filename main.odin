@@ -1634,3 +1634,62 @@ test_parse_ld_b_b :: proc(t: ^testing.T) {
 	test_instruction_parse(t, []byte{0x40}, expected)
 }
 
+@(test)
+test_parse_ld_d_b :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			destination = Value { location = .D },
+			source = Value { location = .B }
+		}
+	}
+	test_instruction_parse(t, []byte{0x50}, expected)
+}
+
+@(test)
+test_parse_ld_h_b :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			destination = Value { location = .H },
+			source = Value { location = .B }
+		}
+	}
+	test_instruction_parse(t, []byte{0x60}, expected)
+}
+
+@(test)
+test_parse_ld_hl_b :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			destination = Value { location = .HL, dereference_in_memory = true },
+			source = Value { location = .B }
+		}
+	}
+	test_instruction_parse(t, []byte{0x70}, expected)
+}
+
+@(test)
+test_parse_ld_e_a :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			destination = Value { location = .E },
+			source = Value { location = .A }
+		}
+	}
+	test_instruction_parse(t, []byte{0x5F}, expected)
+}
+
+@(test)
+test_parse_ld_ld_c_l :: proc(t: ^testing.T) {
+	expected := Instruction{
+		op = Opcode.LD,
+		type = Load {
+			destination = Value { location = .C },
+			source = Value { location = .L }
+		}
+	}
+	test_instruction_parse(t, []byte{0x4D}, expected)
+}
