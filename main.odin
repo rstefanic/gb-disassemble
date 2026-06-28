@@ -202,6 +202,12 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 			parse_ld(binary, instruction)
 		case 0x80..=0xBF:
 			parse_alu_operation(binary, instruction)
+		case 0xC0:
+			parse_ret_nz(binary, instruction)
+		case 0xC1:
+			parse_pop_bc(binary, instruction)
+		case 0xC2:
+			parse_jp_nz_imm16(binary, instruction)
 		case:
 			return DisassembleError.UnexpectedByte
 		}
@@ -874,7 +880,7 @@ parse_jr_nz_s8:: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
 
 	instruction.op = Opcode.JR
 	instruction.type =  ConditionalJump {
-		steps = steps,
+		place = Steps(steps),
 		flag = Flag.Z,
 		set = false
 	}
@@ -886,7 +892,7 @@ test_parse_jr_nz_s8 :: proc(t: ^testing.T) {
 	expected := Instruction{
 		op = Opcode.JR,
 		type = ConditionalJump {
-			steps = 0x10,
+			place = Steps(0x10),
 			flag = Flag.Z,
 			set = false
 		}
@@ -1057,7 +1063,7 @@ parse_jr_z_s8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
 
 	instruction.op = Opcode.JR
 	instruction.type = ConditionalJump {
-		steps = steps,
+		place = Steps(steps),
 		flag = Flag.Z,
 		set = true
 	}
@@ -1069,7 +1075,7 @@ test_parse_jr_z_s8 :: proc(t: ^testing.T) {
 	expected := Instruction{
 		op = Opcode.JR,
 		type = ConditionalJump {
-			steps = 0x67,
+			place = Steps(0x67),
 			flag = Flag.Z,
 			set = true
 		}
@@ -1225,12 +1231,12 @@ test_parse_cpl :: proc(t: ^testing.T) {
 }
 
 parse_jr_nc_s8:: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
-	op_byte:= binary_next(binary) or_return
+	op_byte := binary_next(binary) or_return
 	steps := binary_next(binary) or_return
 
 	instruction.op = Opcode.JR
 	instruction.type =  ConditionalJump {
-		steps = steps,
+		place = Steps(steps),
 		flag = Flag.C,
 		set = false
 	}
@@ -1242,7 +1248,7 @@ test_parse_jr_nc_s8 :: proc(t: ^testing.T) {
 	expected := Instruction{
 		op = Opcode.JR,
 		type = ConditionalJump {
-			steps = 0x20,
+			place = Steps(0x20),
 			flag = Flag.C,
 			set = false
 		}
@@ -1413,7 +1419,7 @@ parse_jr_c_s8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
 
 	instruction.op = Opcode.JR
 	instruction.type = ConditionalJump {
-		steps = steps,
+		place = Steps(steps),
 		flag = Flag.C,
 		set = true
 	}
@@ -1425,7 +1431,7 @@ test_parse_jr_c_s8 :: proc(t: ^testing.T) {
 	expected := Instruction{
 		op = Opcode.JR,
 		type = ConditionalJump {
-			steps = 0x67,
+			place = Steps(0x67),
 			flag = Flag.C,
 			set = true
 		}
@@ -1880,4 +1886,78 @@ test_parse_cp_b :: proc(t: ^testing.T) {
 		}
 	}
 	test_instruction_parse(t, []byte{0xB8}, expected)
+}
+
+parse_ret_nz :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	instruction.op = Opcode.RET
+	instruction.type = ConditionalReturn {
+		flag = .Z,
+		set = false
+	}
+	return nil
+}
+
+@(test)
+test_parse_ret_nz :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.RET,
+		type = ConditionalReturn {
+			flag = .Z,
+			set = false
+		}
+	}
+	test_instruction_parse(t, []byte{0xC0}, expected)
+}
+
+parse_pop_bc :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.POP
+	instruction.type = Pop {
+		destination = Value { location = .BC }
+	}
+	return nil
+}
+
+@(test)
+test_parse_pop_bc :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.POP,
+		type = Pop {
+			destination = Value { location = .BC }
+		}
+	}
+	test_instruction_parse(t, []byte{0xC1}, expected)
+}
+
+parse_jp_nz_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	lo := binary_next(binary) or_return
+	hi := binary_next(binary) or_return
+
+	imm16: u16 = (cast(u16)hi << 8) | (cast(u16)lo)
+
+	instruction.op = Opcode.JP
+	instruction.type = ConditionalJump {
+		place = Location(imm16),
+		flag = .Z,
+		set = false
+	}
+	
+	return nil
+}
+
+@(test)
+test_parse_jp_nz_imm16 :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .JP,
+		type = ConditionalJump {
+			place = Location(0x1234),
+			flag = .Z,
+			set = false
+		}
+	}
+	test_instruction_parse(t, []byte{0xC2, 0x34, 0x12}, expected)
 }

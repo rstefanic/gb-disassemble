@@ -37,12 +37,18 @@ Value :: struct {
 	}
 }
 
+Steps :: distinct u8
+Location :: distinct u16
+
 // Instruction Types
 Control :: struct {}
 ConditionalJump :: struct {
-	steps: u8,
 	flag: Flag,
-	set: bool
+	set: bool,
+	place: union {
+		Steps,
+		Location
+	}
 }
 UnconditionalJump :: struct {
 	steps: u8
@@ -58,6 +64,15 @@ BinaryArithmetic :: struct {
 	destination: Value,
 	source: Value,
 }
+ConditionalReturn :: struct {
+	// TODO: See if `ConditionalReturn` can't be replaced with
+	// Conditional Jump since that's effectively what it is.
+	flag: Flag,
+	set: bool
+}
+Pop :: struct {
+	destination: Value
+}
 BitShift :: struct {}
 
 Instruction :: struct {
@@ -69,6 +84,8 @@ Instruction :: struct {
 		ConditionalJump,
 		UnaryArithmetic,
 		BinaryArithmetic,
+		ConditionalReturn,
+		Pop,
 		BitShift
 	}
 }
