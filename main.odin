@@ -199,13 +199,7 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 			// Handle HALT here because it's the odd instruction in the next range
 			parse_halt(binary, instruction) or_return
 		case 0x40..=0x7F:
-			load_op_byte := binary_next(binary) or_return
-			destination_bits := (load_op_byte >> 3) & 0x07 // 00xxx000
-			source_bits := load_op_byte & 0x07             // 00000xxx
-
-			destination := map_bits_to_register(destination_bits)
-			source := map_bits_to_register(source_bits)
-			parse_ld(instruction, destination, source)
+			parse_ld(binary, instruction)
 		case 0x80..=0xBF:
 			parse_alu_operation(binary, instruction)
 		case:
@@ -214,24 +208,6 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 	}
 
 	return nil
-}
-
-map_bits_to_register :: proc (bits: u8) -> Value {
-	out := Value { location = .B }
-	switch bits {
-		case 0b000: out = Value { location = .B }
-		case 0b001: out = Value { location = .C }
-		case 0b010: out = Value { location = .D }
-		case 0b011: out = Value { location = .E }
-		case 0b100: out = Value { location = .H }
-		case 0b101: out = Value { location = .L }
-		case 0b110:
-			// The HL is the odd one in this mapping that dereferences memory every time.
-			out = Value { location = .HL, dereference_in_memory = true }
-		case 0b111: out = Value { location = .A }
-	}
-
-	return out
 }
 
 parse_nop :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
@@ -1616,12 +1592,40 @@ test_parse_halt :: proc(t: ^testing.T) {
 	test_instruction_parse(t, []byte{0x76}, expected)
 }
 
-parse_ld :: proc(instruction: ^Instruction, destination: Value, source: Value) {
+map_bits_to_register :: proc (bits: u8) -> Value {
+	out := Value { location = .B }
+	switch bits {
+		case 0b000: out = Value { location = .B }
+		case 0b001: out = Value { location = .C }
+		case 0b010: out = Value { location = .D }
+		case 0b011: out = Value { location = .E }
+		case 0b100: out = Value { location = .H }
+		case 0b101: out = Value { location = .L }
+		case 0b110:
+			// The HL is the odd one in this mapping that dereferences memory every time.
+			out = Value { location = .HL, dereference_in_memory = true }
+		case 0b111: out = Value { location = .A }
+	}
+
+	return out
+}
+
+parse_ld :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	load_op_byte := binary_next(binary) or_return
+	destination_bits := (load_op_byte >> 3) & 0x07 // 00xxx000
+	source_bits := load_op_byte & 0x07             // 00000xxx
+
+	// Map bits to their register values.
+	destination := map_bits_to_register(destination_bits)
+	source := map_bits_to_register(source_bits)
+
 	instruction.op = Opcode.LD
 	instruction.type = Load {
 		destination = destination,
 		source = source
 	}
+
+	return nil
 }
 
 @(test)
