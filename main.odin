@@ -206,6 +206,8 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 			destination := map_bits_to_register(destination_bits)
 			source := map_bits_to_register(source_bits)
 			parse_ld(instruction, destination, source)
+		case 0x80..=0xBF:
+			parse_alu_operation(binary, instruction)
 		case:
 			return DisassembleError.UnexpectedByte
 		}
@@ -1692,4 +1694,186 @@ test_parse_ld_ld_c_l :: proc(t: ^testing.T) {
 		}
 	}
 	test_instruction_parse(t, []byte{0x4D}, expected)
+}
+
+map_bits_to_opcode :: proc (bits: u8) -> Opcode {
+	switch(bits) {
+	case 0b000:
+		return Opcode.ADD
+	case 0b001:
+		return Opcode.ADC
+	case 0b010:
+		return Opcode.SUB
+	case 0b011:
+		return Opcode.SBC
+	case 0b100:
+		return Opcode.AND
+	case 0b101:
+		return Opcode.XOR
+	case 0b110:
+		return Opcode.OR
+	case:
+		return Opcode.CP
+	}
+}
+
+parse_alu_operation :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	operation_bits := (op_byte >> 3) & 0x07  // 00xxx000
+	source_register := op_byte & 0x07        // 00000xxx
+
+	opcode := map_bits_to_opcode(operation_bits)
+	source := map_bits_to_register(source_register)
+
+	instruction.op = opcode
+	instruction.type = BinaryArithmetic {
+		destination = Value { location = .A },
+		source = source
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_add_a_b :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.ADD,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .B }
+		}
+	}
+	test_instruction_parse(t, []byte{0x80}, expected)
+}
+
+@(test)
+test_parse_add_a_hl :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.ADD,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .HL, dereference_in_memory = true }
+		}
+	}
+	test_instruction_parse(t, []byte{0x86}, expected)
+}
+
+@(test)
+test_parse_adc_a_d :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.ADC,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .D }
+		}
+	}
+	test_instruction_parse(t, []byte{0x8A}, expected)
+}
+
+@(test)
+test_parse_adc_a_h :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.ADC,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .H }
+		}
+	}
+	test_instruction_parse(t, []byte{0x8C}, expected)
+}
+
+@(test)
+test_parse_sub_c :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.SUB,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .C }
+		}
+	}
+	test_instruction_parse(t, []byte{0x91}, expected)
+}
+
+@(test)
+test_parse_sub_e :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.SUB,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .E }
+		}
+	}
+	test_instruction_parse(t, []byte{0x93}, expected)
+}
+
+@(test)
+test_parse_sbc_a_h :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.SBC,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .H }
+		}
+	}
+	test_instruction_parse(t, []byte{0x9C}, expected)
+}
+
+@(test)
+test_parse_and_l :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.AND,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .L }
+		}
+	}
+	test_instruction_parse(t, []byte{0xA5}, expected)
+}
+
+@(test)
+test_parse_xor_a :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.XOR,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .A }
+		}
+	}
+	test_instruction_parse(t, []byte{0xAF}, expected)
+}
+
+@(test)
+test_parse_or_d :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.OR,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .D }
+		}
+	}
+	test_instruction_parse(t, []byte{0xB2}, expected)
+}
+
+@(test)
+test_parse_or_h :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.OR,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .H }
+		}
+	}
+	test_instruction_parse(t, []byte{0xB4}, expected)
+}
+
+@(test)
+test_parse_cp_b :: proc(t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.CP,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = .B }
+		}
+	}
+	test_instruction_parse(t, []byte{0xB8}, expected)
 }
