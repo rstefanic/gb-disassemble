@@ -51,7 +51,10 @@ ConditionalJump :: struct {
 	}
 }
 UnconditionalJump :: struct {
-	steps: u8
+	place: union {
+		Steps,
+		Location
+	}
 }
 Load :: struct {
 	destination: Value,
@@ -70,6 +73,9 @@ ConditionalReturn :: struct {
 	flag: Flag,
 	set: bool
 }
+StackControl :: struct {
+	destination: Value
+}
 Pop :: struct {
 	destination: Value
 }
@@ -85,7 +91,7 @@ Instruction :: struct {
 		UnaryArithmetic,
 		BinaryArithmetic,
 		ConditionalReturn,
-		Pop,
+		StackControl,
 		BitShift
 	}
 }
