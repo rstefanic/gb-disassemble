@@ -198,10 +198,16 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 		case 0x76:
 			// Handle HALT here because it's the odd instruction in the next range
 			parse_halt(binary, instruction) or_return
+
+		// 0x40 - 0x7F
 		case 0x40..=0x7F:
 			parse_ld(binary, instruction)
+
+		// 0x80 - 0xBF
 		case 0x80..=0xBF:
 			parse_alu_operation(binary, instruction)
+
+		// 0xC0 - 0xCF
 		case 0xC0:
 			parse_ret_nz(binary, instruction) or_return
 		case 0xC1:
@@ -225,7 +231,10 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 		case 0xCA:
 			parse_jp_z_imm16(binary, instruction) or_return
 		case 0xCB:
-			// TODO: Implement multibyte instruction
+            // Pop the 0xCB from the binary as we know at this point
+            // that we're parsing a 16 bit instruction.
+            _ = binary_next(binary) or_return
+            parse_bit_manipulation_operation(binary, instruction) or_return
 		case 0xCC:
 			parse_call_z_imm16(binary, instruction) or_return
 		case 0xCD:
@@ -2282,3 +2291,107 @@ test_parse_rst_1 :: proc (t: ^testing.T) {
 	test_instruction_parse(t, []byte{0xCF}, expected)
 }
 
+parse_bit_manipulation_operation :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	// The 0xCB instructions follow a bit pattern of GGOOOTTT where:
+	//  - GG  makes up the instruction group
+	//  - OOO makes up the operation in that instruction group
+	//  - TTT makes up the target of the operation
+
+	op_byte        := binary_next(binary) or_return
+	group_bits     := (op_byte >> 6) & 0b00000011 // 000000GG
+	operation_bits := (op_byte >> 3) & 0b00000111 // 00000OOO
+	target_bits    := op_byte        & 0b00000111 // 00000TTT
+
+	register := map_bits_to_register(target_bits)
+
+    if group_bits == 0b00 {
+        // For the bit shifting and rotating group,
+        // the operation_bits tell us which Opcode
+        // is being used.
+        switch(operation_bits) {
+        case 0b000:
+            instruction.op = .RLC
+        case 0b001:
+            instruction.op = .RRC
+        case 0b010:
+            instruction.op = .RL
+        case 0b011:
+            instruction.op = .RR
+        case 0b100:
+            instruction.op = .SLA
+        case 0b101:
+            instruction.op = .SRA
+        case 0b110:
+            instruction.op = .SWAP
+        case:
+            instruction.op = .SRL
+        }
+        instruction.type = BitShift {
+            destination = register
+        }
+        return nil
+    }
+
+    switch(group_bits) {
+    case 0b00:
+    case 0b01:
+        instruction.op = .BIT
+    case 0b10:
+        instruction.op = .RES
+    case 0b11:
+        instruction.op = .SET
+    }
+    instruction.type = RegisterBit {
+        bit = operation_bits,
+        register = register,
+    }
+
+	return nil
+}
+
+@(test)
+test_parse_rlc_b :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .RLC,
+		type = BitShift {
+			destination = Value { location = .B }
+		}
+	}
+	test_instruction_parse(t, []byte{0xCB, 0x00}, expected)
+}
+
+@(test)
+test_parse_bit_3_d :: proc (t: ^testing.T) {
+    expected := Instruction {
+        op = .BIT,
+        type = RegisterBit {
+            bit = 0x03,
+            register = Value { location = .D }
+        }
+    }
+    test_instruction_parse(t, []byte{0xCB, 0x5A}, expected)
+}
+
+@(test)
+test_parse_res_4_e :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .RES,
+		type = RegisterBit {
+            bit = 0x04,
+			register = Value { location = .E }
+		}
+	}
+	test_instruction_parse(t, []byte{0xCB, 0xA3}, expected)
+}
+
+@(test)
+test_parse_set_6_hl :: proc (t: ^testing.T) {
+    expected := Instruction {
+        op = .SET,
+        type = RegisterBit {
+            bit = 0x06,
+            register = Value { location = .HL, dereference_in_memory = true }
+        }
+    }
+    test_instruction_parse(t, []byte{0xCB, 0xF6}, expected)
+}

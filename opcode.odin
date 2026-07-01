@@ -79,7 +79,15 @@ StackControl :: struct {
 Pop :: struct {
 	destination: Value
 }
-BitShift :: struct {}
+BitShift :: struct {
+    destination: Value
+}
+RegisterBit :: struct {
+    bit: u8,
+    // `register` here needs to be a `Value` since we need the
+    // information on `dereference_in_memory` for register HL.
+    register: Value
+}
 
 Instruction :: struct {
 	op: Opcode,
@@ -92,7 +100,8 @@ Instruction :: struct {
 		BinaryArithmetic,
 		ConditionalReturn,
 		StackControl,
-		BitShift
+		BitShift,
+        RegisterBit
 	}
 }
 
