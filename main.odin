@@ -243,6 +243,34 @@ disassemble :: proc (binary: ^Binary, instructions: ^[dynamic]Instruction) -> Er
 			parse_adc_a_imm8(binary, instruction) or_return
 		case 0xCF:
 			parse_rst_1(binary, instruction) or_return
+
+        // 0xD0 - 0xDF
+        case 0xD0:
+            parse_ret_nc(binary, instruction) or_return
+        case 0xD1:
+            parse_pop_de(binary, instruction) or_return
+        case 0xD2:
+            parse_jp_nc_imm16(binary, instruction) or_return
+        case 0xD4:
+            parse_call_nc_imm16(binary, instruction) or_return
+		case 0xD5:
+			parse_push_de(binary, instruction) or_return
+		case 0xD6:
+			parse_sub_imm8(binary, instruction) or_return
+		case 0xD7:
+			parse_rst_2(binary, instruction) or_return
+		case 0xD8:
+			parse_ret_c(binary, instruction) or_return
+		case 0xD9:
+			parse_reti(binary, instruction) or_return
+		case 0xDA:
+			parse_jp_c_imm16(binary, instruction) or_return
+		case 0xDC:
+			parse_call_c_imm16(binary, instruction) or_return
+		case 0xDE:
+			parse_sbc_a_imm8(binary, instruction) or_return
+		case 0xDF:
+			parse_rst_3(binary, instruction) or_return
 		case:
 			return DisassembleError.UnexpectedByte
 		}
@@ -2394,4 +2422,321 @@ test_parse_set_6_hl :: proc (t: ^testing.T) {
         }
     }
     test_instruction_parse(t, []byte{0xCB, 0xF6}, expected)
+}
+
+parse_ret_nc :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	instruction.op = Opcode.RET
+	instruction.type = ConditionalReturn {
+		flag = .C,
+		set = false
+	}
+	return nil
+}
+
+@(test)
+test_parse_ret_nc :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.RET,
+		type = ConditionalReturn {
+			flag = .C,
+			set = false
+		}
+	}
+	test_instruction_parse(t, []byte{0xD0}, expected)
+}
+
+parse_pop_de :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = Opcode.POP
+	instruction.type = StackControl {
+		destination = Value { location = .DE }
+	}
+	return nil
+}
+
+@(test)
+test_parse_pop_de :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = Opcode.POP,
+		type = StackControl {
+			destination = Value { location = .DE }
+		}
+	}
+	test_instruction_parse(t, []byte{0xD1}, expected)
+}
+
+parse_jp_nc_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	lo := binary_next(binary) or_return
+	hi := binary_next(binary) or_return
+
+	imm16: u16 = (cast(u16)hi << 8) | (cast(u16)lo)
+
+	instruction.op = Opcode.JP
+	instruction.type = ConditionalJump {
+		place = Location(imm16),
+		flag = .C,
+		set = false
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_jp_nc_imm16 :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .JP,
+		type = ConditionalJump {
+			place = Location(0x1234),
+			flag = .C,
+			set = false
+		}
+	}
+	test_instruction_parse(t, []byte{0xD2, 0x34, 0x12}, expected)
+}
+
+parse_call_nc_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	lo := binary_next(binary) or_return
+	hi := binary_next(binary) or_return
+	imm16: u16 = (cast(u16)hi << 8) | (cast(u16)lo)
+
+	instruction.op = .CALL
+	instruction.type = ConditionalJump {
+		flag = .C,
+		set = false,
+		place = Location(imm16)
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_call_nc_imm16 :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .CALL,
+		type = ConditionalJump {
+			flag = .C,
+			set = false,
+			place = Location(0x3412),
+		}
+	}
+	test_instruction_parse(t, []byte{0xD4, 0x12, 0x34}, expected)
+}
+
+parse_push_de :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	instruction.op = .PUSH
+	instruction.type = StackControl {
+		destination = Value { location = .DE }
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_push_de :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .PUSH,
+		type = StackControl {
+			destination = Value { location = .DE }
+		}
+	}
+	test_instruction_parse(t, []byte{0xD5}, expected)
+}
+
+parse_sub_imm8 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	imm8 := binary_next(binary) or_return
+
+	instruction.op = .SUB
+	instruction.type = BinaryArithmetic {
+		destination = Value { location = .A },
+		source = Value { location = u8(imm8) }
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_sub_imm8 :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .SUB,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = u8(0x67) }
+		}
+	}
+	test_instruction_parse(t, []byte{0xD6, 0x67}, expected)
+}
+
+parse_rst_2 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	instruction.op = .RST
+	instruction.type = UnconditionalJump {
+		place = Location(0x0010)
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_rst_2 :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .RST,
+		type = UnconditionalJump {
+			place = Location(0x0010)
+		}
+	}
+	test_instruction_parse(t, []byte{0xD7}, expected)
+}
+
+parse_ret_c :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	instruction.op = .RET
+	instruction.type = ConditionalJump {
+		flag = .C,
+		set = true
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_ret_c :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .RET,
+		type = ConditionalJump {
+			flag = .C,
+			set = true
+		}
+	}
+	test_instruction_parse(t, []byte{0xD8}, expected)
+}
+
+parse_reti :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	instruction.op = .RETI
+	return nil
+}
+
+@(test)
+test_parse_reti :: proc (t: ^testing.T) {
+	expected := Instruction { op = .RETI }
+	test_instruction_parse(t, []byte{0xD9}, expected)
+}
+
+parse_jp_c_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	lo := binary_next(binary) or_return
+	hi := binary_next(binary) or_return
+
+	imm16: u16 = (cast(u16)hi << 8) | (cast(u16)lo)
+
+	instruction.op = Opcode.JP
+	instruction.type = ConditionalJump {
+		place = Location(imm16),
+		flag = .C,
+		set = true
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_jp_c_imm16 :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .JP,
+		type = ConditionalJump {
+			place = Location(0x1234),
+			flag = .C,
+			set = true
+		}
+	}
+	test_instruction_parse(t, []byte{0xDA, 0x34, 0x12}, expected)
+}
+
+parse_call_c_imm16 :: proc (binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	lo := binary_next(binary) or_return
+	hi := binary_next(binary) or_return
+	imm16: u16 = (cast(u16)hi << 8) | (cast(u16)lo)
+
+	instruction.op = .CALL
+	instruction.type = ConditionalJump {
+		flag = .C,
+		set = true,
+		place = Location(imm16)
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_call_c_imm16 :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .CALL,
+		type = ConditionalJump {
+			flag = .C,
+			set = true,
+			place = Location(0x3412),
+		}
+	}
+	test_instruction_parse(t, []byte{0xDC, 0x12, 0x34}, expected)
+}
+
+parse_sbc_a_imm8 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+	imm8 := binary_next(binary) or_return
+
+	instruction.op = .SBC
+	instruction.type = BinaryArithmetic {
+		destination = Value { location = .A },
+		source = Value { location = u8(imm8)}
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_sbc_a_imm8 :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .SBC,
+		type = BinaryArithmetic {
+			destination = Value { location = .A },
+			source = Value { location = u8(0x67) }
+		}
+	}
+	test_instruction_parse(t, []byte{0xDE, 0x67}, expected)
+}
+
+parse_rst_3 :: proc(binary: ^Binary, instruction: ^Instruction) -> Error {
+	op_byte := binary_next(binary) or_return
+
+	instruction.op = .RST
+	instruction.type = UnconditionalJump {
+		place = Location(0x0018)
+	}
+
+	return nil
+}
+
+@(test)
+test_parse_rst_3 :: proc (t: ^testing.T) {
+	expected := Instruction {
+		op = .RST,
+		type = UnconditionalJump {
+			place = Location(0x0018)
+		}
+	}
+	test_instruction_parse(t, []byte{0xDF}, expected)
 }
